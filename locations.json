@@ -1,0 +1,20 @@
+[
+    {
+        "cat": "industrial",
+        "lat": 46.4925,
+        "lng": 30.7333,
+        "title": "Завод на Пересыпи (Одесса)",
+        "img": "https://images.unsplash.com/photo-1565775500335-3c5d3c5c3c5c?q=80&w=600",
+        "desc": "Остатки советских цехов. Много ржавчины и граффити.",
+        "isOdessa": true
+    },
+    {
+        "cat": "civil",
+        "lat": 46.1850,
+        "lng": 30.6350,
+        "title": "Санаторий в Черноморске",
+        "img": "https://images.unsplash.com/photo-1532117182044-8896ccd7c0da?q=80&w=600",
+        "desc": "Пустые коридоры с видом на море. Заросли плюща.",
+        "isOdessa": false
+    }
+]

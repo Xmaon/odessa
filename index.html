@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Тень Одессы | Карта заброшек</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg: #1a1a1a;
+            --panel-bg: #2b2b2b;
+            --accent: #e67e22;
+            --text: #f0f0f0;
+            --muted: #888;
+            --border: #444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #000; color: var(--text); overflow: hidden; height: 100vh; -webkit-tap-highlight-color: transparent; }
+
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; background: #111; }
+
+        .top-bar {
+            position: absolute; top: 15px; left: 15px; right: 15px; z-index: 1000;
+            display: flex; gap: 10px; align-items: center; pointer-events: none;
+        }
+        .menu-toggle {
+            pointer-events: auto; background: var(--bg); padding: 12px; border-radius: 8px;
+            border: 1px solid var(--border); cursor: pointer; font-size: 18px; color: #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: none;
+        }
+        .filters-container {
+            pointer-events: auto; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 8px; display: flex; gap: 8px; overflow-x: auto;
+            white-space: nowrap; max-width: calc(100% - 60px); box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        .filters-container::-webkit-scrollbar { display: none; }
+        .chip {
+            background: var(--panel-bg); padding: 8px 14px; border-radius: 20px; font-size: 14px;
+            color: var(--text); cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .chip.active { background: var(--accent); color: #fff; }
+        .chip:hover:not(.active) { border-color: var(--accent); }
+
+        .bottom-bar {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; display: flex; gap: 10px; background: var(--bg);
+            padding: 8px; border-radius: 50px; border: 1px solid var(--border);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .bb-btn {
+            display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 30px;
+            text-decoration: none; font-size: 14px; font-weight: 600; transition: 0.2s; cursor: pointer; border: none;
+        }
+        .bb-btn.tg { background: transparent; color: #fff; }
+        .bb-btn.tg:hover { background: var(--panel-bg); }
+        .bb-btn.submit { background: var(--accent); color: #fff; }
+        .bb-btn.submit:hover { opacity: 0.9; }
+
+        .sidebar {
+            position: absolute; top: 0; left: 0; height: 100vh; width: 360px; background: var(--bg);
+            z-index: 1100; box-shadow: 2px 0 15px rgba(0,0,0,0.5); display: flex; flex-direction: column;
+            transform: translateX(-100%); transition: transform 0.3s ease;
+        }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 20px; font-weight: 700; color: #fff; }
+        .logo span { color: var(--accent); }
+        .close-btn { background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; }
+
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 20px; }
+        .sidebar-content::-webkit-scrollbar { width: 6px; }
+        .sidebar-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        .intro p { color: var(--muted); font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+        .news-item { background: var(--panel-bg); padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid var(--accent); }
+        .news-date { font-size: 12px; color: var(--accent); font-weight: 700; margin-bottom: 4px; }
+        .news-text h4 { font-size: 14px; margin-bottom: 4px; color: #fff; }
+        .news-text p { font-size: 13px; color: var(--muted); line-height: 1.4; }
+        .sidebar-footer { padding: 15px 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); text-align: center; }
+
+        .leaflet-popup-content-wrapper { background: var(--bg); color: var(--text); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid var(--border); }
+        .leaflet-popup-tip { background: var(--bg); border: 1px solid var(--border); }
+        .leaflet-popup-content { margin: 12px; width: 220px !important; }
+        .leaflet-container a.leaflet-popup-close-button { color: #fff; top: 8px; right: 8px; }
+        .popup-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+        .popup-img { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; margin-bottom: 8px; }
+        .popup-desc { font-size: 13px; color: #ccc; margin-bottom: 10px; line-height: 1.4; }
+        .popup-warning { font-size: 12px; color: #ff6666; background: rgba(255,0,0,0.1); padding: 5px; border-radius: 4px; margin-bottom: 8px; }
+        .popup-coords { font-size: 12px; color: var(--muted); margin-bottom: 8px; font-family: monospace; }
+        .popup-actions { display: flex; flex-direction: column; gap: 6px; }
+        .popup-btn { background: var(--panel-bg); color: #fff; border: 1px solid var(--border); padding: 6px; border-radius: 4px; text-align: center; text-decoration: none; font-size: 12px; cursor: pointer; }
+        .popup-btn:hover { background: var(--accent); border-color: var(--accent); }
+
+        .leaflet-control-layers { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+        .leaflet-control-layers-expanded { padding: 8px; }
+        .leaflet-control-layers label { font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+        .leaflet-bar a { background: var(--bg); color: #fff; border-bottom: 1px solid var(--border); }
+        .leaflet-bar a:hover { background: var(--accent); }
+
+        @media (max-width: 768px) {
+            .menu-toggle { display: block; }
+            .sidebar { width: 85%; }
+            .filters-container { max-width: calc(100% - 60px); padding: 6px; }
+            .chip { font-size: 13px; padding: 6px 10px; }
+            .leaflet-popup-content { width: 180px !important; }
+            .bottom-bar { bottom: 15px; width: 95%; justify-content: center; }
+            .bb-btn { padding: 8px 15px; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+        <div class="filters-container">
+            <div class="chip active" data-cat="industrial">🏭 Индустриальные</div>
+            <div class="chip active" data-cat="civil">🏚️ Гражданские</div>
+            <div class="chip active" data-cat="underground">🚇 Подземелья</div>
+            <div class="chip active" data-cat="military">⚔️ Военные</div>
+        </div>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">Тень <span>Одессы</span></div>
+            <button class="close-btn" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="sidebar-content">
+            <div class="intro">
+                <p>Интерактивная карта заброшенных мест Одессы и области. Кликайте на метки для просмотра фото, истории и координат.</p>
+            </div>
+            <div class="news-item">
+                <div class="news-date">15 Мая</div>
+                <div class="news-text">
+                    <h4>Снос старого завода</h4>
+                    <p>На днях начали сносить исторические корпуса. Мы успели съездить туда на прошлой неделе.</p>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            &copy; 2024 Тень Одессы. Не бери ничего, кроме фотографий.
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Нижняя панель с кнопками (просто ссылки) -->
+    <div class="bottom-bar">
+        <!-- ЗАМЕНИТЕ ССЫЛКУ НА СВОЙ КАНАЛ -->
+        <a href="https://t.me/your_channel_link" target="_blank" class="bb-btn tg">📢 Канал</a>
+        <!-- ЗАМЕНИТЕ ССЫЛКУ НА СВОЙ КАНАЛ ИЛИ БОТА -->
+        <a href="https://t.me/your_channel_link" target="_blank" class="bb-btn submit">➕ Предложить</a>
+    </div>
+
+    <script>
+        const map = L.map('map', { zoomControl: false }).setView([46.4825, 30.7233], 11);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19
+        }).addTo(map);
+
+        const satellite = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+            maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
+        });
+
+        L.control.layers({
+            "Темная карта": darkMap,
+            "Спутник": satellite
+        }, null, { position: 'topright' }).addTo(map);
+
+        const icons = {
+            industrial: L.divIcon({ html: '🏭', className: '', iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30] }),
+            civil: L.divIcon({ html: '🏚️', className: '', iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30] }),
+            underground: L.divIcon({ html: '🚇', className: '', iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30] }),
+            military: L.divIcon({ html: '⚔️', className: '', iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30] })
+        };
+
+        let activeFilters = ['industrial', 'civil', 'underground', 'military'];
+        let markersLayer = L.layerGroup().addTo(map);
+        let locations = [];
+
+        async function loadData() {
+            try {
+                const res = await fetch('locations.json');
+                locations = await res.json();
+                locations.forEach(loc => {
+                    if (loc.isOdessa) {
+                        loc.lat += (Math.random() - 0.5) * 0.03;
+                        loc.lng += (Math.random() - 0.5) * 0.03;
+                    }
+                });
+                renderMarkers();
+            } catch (e) {
+                console.error("Ошибка загрузки JSON. Загрузите сайт через сервер (например, Netlify).", e);
+            }
+        }
+
+        function renderMarkers() {
+            markersLayer.clearLayers();
+            locations.forEach(loc => {
+                if (!activeFilters.includes(loc.cat)) return;
+
+                const marker = L.marker([loc.lat, loc.lng], { icon: icons[loc.cat] });
+                const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
+                const ymapsUrl = `https://yandex.ru/maps/?text=${loc.lat},${loc.lng}`;
+
+                let popup = `
+                    <div class="popup-title">${loc.title}</div>
+                    <img src="${loc.img}" class="popup-img" alt="${loc.title}">
+                    <div class="popup-desc">${loc.desc}</div>
+                `;
+                if (loc.isOdessa) {
+                    popup += `<div class="popup-warning">⚠️ Точное место скрыто. Координаты примерные.</div>`;
+                }
+                popup += `
+                    <div class="popup-coords">📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</div>
+                    <div class="popup-actions">
+                        <button class="popup-btn" onclick="copyCoords('${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}')">Копировать координаты</button>
+                        <a href="${gmapsUrl}" target="_blank" class="popup-btn">Открыть в Google Maps</a>
+                        <a href="${ymapsUrl}" target="_blank" class="popup-btn">Открыть в Яндекс.Картах</a>
+                    </div>
+                `;
+                marker.bindPopup(popup);
+                markersLayer.addLayer(marker);
+            });
+        }
+
+        document.querySelectorAll('.chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const cat = chip.dataset.cat;
+                const i = activeFilters.indexOf(cat);
+                if (i > -1) { activeFilters.splice(i, 1); chip.classList.remove('active'); }
+                else { activeFilters.push(cat); chip.classList.add('active'); }
+                renderMarkers();
+            });
+        });
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+        function copyCoords(text) {
+            navigator.clipboard.writeText(text).then(() => { alert('Координаты скопированы: ' + text); });
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
